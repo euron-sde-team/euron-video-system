@@ -1,0 +1,60 @@
+#!/bin/bash
+# Worker bootstrap. Secrets are read from Secrets Manager with the instance
+# role at boot and written to a root-only env file; nothing secret is baked
+# into the AMI or this user data.
+set -euo pipefail
+
+REGION="${region}"
+install -d -m 0750 -o root -g evs /etc/evs
+
+secret() { aws secretsmanager get-secret-value --region "$REGION" --secret-id "$1" --query SecretString --output text; }
+SHARED="$(secret "${shared_secret_arn}")"
+# The database password is NOT written here: the worker reads it from the
+# RDS-managed secret for every new connection, so RDS password rotation needs
+# no reboot and the env file never holds the database password.
+
+umask 027
+cat > /etc/evs/worker.env <<ENV
+NODE_ENV=production
+TZ=UTC
+EVS_CLOUD=aws
+EVS_SERVICE=worker
+AWS_REGION=$REGION
+WORKER_PLATFORM=ec2
+WORKER_MODE=${worker_mode}
+WORKER_DRY_RUN_SHUTDOWN=false
+WORK_DIR=/var/lib/evs/work
+PG_POOL_MAX=3
+DATABASE_SECRET_ARN=${db_secret_arn}
+DB_HOST=${db_address}
+DB_PORT=${db_port}
+DB_NAME=${db_name}
+DB_USER=${db_username}
+DB_SSL=require
+DATA_ENCRYPTION_KEY=$(jq -r .DATA_ENCRYPTION_KEY <<<"$SHARED")
+UPLOADS_BUCKET=${uploads_bucket}
+MEDIA_BUCKET=${media_bucket}
+DOWNLOADS_BUCKET=${downloads_bucket}
+KMS_KEY_ID=${kms_key_alias}
+%{ for k, v in extra_environment ~}
+${k}=${v}
+%{ endfor ~}
+ENV
+chown root:evs /etc/evs/worker.env
+
+# Ship the service journal to CloudWatch Logs.
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CW'
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          { "file_path": "/var/log/evs/worker.log", "log_group_name": "${log_group}", "log_stream_name": "{instance_id}" }
+        ]
+      }
+    }
+  }
+}
+CW
+systemctl enable --now amazon-cloudwatch-agent || true
+systemctl enable --now evs-worker.service

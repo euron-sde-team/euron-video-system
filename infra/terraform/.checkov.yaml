@@ -1,0 +1,38 @@
+# Checkov policy for infra/terraform. Every skip is a deliberate design
+# decision, documented here so reviewers can challenge it.
+framework: [terraform]
+compact: true
+quiet: true
+# Open-source checkov carries no severities, so ANY finding fails CI. Global
+# skips below; resource-specific ones are inline `#checkov:skip` comments
+# next to the resource, each with its reason.
+skip-check:
+  # S3 versioning: outputs are reproducible from sources; uploads expire by design.
+  - CKV_AWS_21
+  # S3 access logging / event notifications / cross-region replication: opt-in per deployment.
+  - CKV_AWS_18
+  - CKV2_AWS_62
+  - CKV_AWS_144
+  # Media bucket uses SSE-S3: segments are already AES-128 encrypted per video,
+  # and SSE-KMS would require granting CloudFront kms:Decrypt.
+  - CKV_AWS_145
+  # CloudFront: WAF and access logging are optional inputs (web_acl_arn, logging_bucket_domain_name).
+  - CKV_AWS_68
+  - CKV_AWS_86
+  - CKV2_AWS_47
+  # CloudFront origin failover: single-origin media distribution.
+  - CKV_AWS_310
+  # Lambda code signing: optional; artifacts are built in CI from this repo.
+  - CKV_AWS_272
+  # Lambda env vars hold only non-secret config (the DB secret is fetched at runtime).
+  - CKV_AWS_173
+  # ALB is intentionally internet-facing; WAF attachment is left to the deployer.
+  - CKV2_AWS_28
+  # SG egress 0.0.0.0/0:443: tasks/workers call AWS APIs and customer webhook receivers.
+  - CKV_AWS_382
+  # CloudWatch log groups use the default AWS-owned encryption.
+  - CKV_AWS_158
+  # Log retention is configurable (default 30 days, below the 1-year check).
+  - CKV_AWS_338
+  # Secrets rotation: RDS rotates its managed secret; app secrets rotate via keyring (see security.md).
+  - CKV2_AWS_57

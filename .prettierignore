@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+.terraform
+*.tfstate*
+packages/core/src/db/types.ts

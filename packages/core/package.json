@@ -1,0 +1,43 @@
+{
+  "name": "@evs/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared runtime for Euron Video System: validated config, database, Postgres queue, storage, envelope encryption, errors, logging.",
+  "exports": {
+    "./config": "./src/config/index.ts",
+    "./db": "./src/db/index.ts",
+    "./queue": "./src/queue/index.ts",
+    "./queue/sql": "./src/queue/sql.ts",
+    "./errors": "./src/errors/index.ts",
+    "./logger": "./src/logger.ts",
+    "./storage": "./src/storage/index.ts",
+    "./crypto": "./src/crypto/index.ts",
+    "./crypto/store": "./src/crypto/content-key-store.ts",
+    "./constants": "./src/constants.ts",
+    "./db/connection": "./src/db/connection-config.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.700.0",
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/client-secrets-manager": "^3.700.0",
+    "@aws-sdk/s3-presigned-post": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "kysely": "^0.28.8",
+    "pg": "^8.16.3",
+    "ulid": "^2.3.0",
+    "winston": "^3.18.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.15.6",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

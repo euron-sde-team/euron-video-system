@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="470" viewBox="0 0 1400 470" role="img" aria-labelledby="t d">
+  <title id="t">Life of a video</title>
+  <desc id="d">Seven stages from direct upload to tokenized playback, with the video status, the component responsible and the guarantee each stage provides.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#3b4a66"/>
+    </marker>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0V28" fill="none" stroke="#ffffff" stroke-opacity="0.03"/>
+    </pattern>
+    <style>
+      .h  { font: 600 20px Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #eef1f7; }
+      .n  { font: 600 12px "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace; fill: #5b8cff; }
+      .t  { font: 600 15px Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #eef1f7; }
+      .s  { font: 400 12.5px Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #9aa3b5; }
+      .c  { font: 400 11px "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace; fill: #7d879b; }
+      .st { font: 500 11px "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+      .card { fill: #131822; stroke: #263042; stroke-width: 1.2; }
+      .ready { fill: #10201b; stroke: #2f7d5d; stroke-width: 1.4; }
+      .play  { fill: #141c2e; stroke: #3b5bdb; stroke-width: 1.4; }
+      .rule { stroke: #222a38; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect width="1400" height="470" rx="18" fill="#0b0d12"/>
+  <rect width="1400" height="470" rx="18" fill="url(#grid)"/>
+  <text class="h" x="32" y="52">Life of a video</text>
+  <text class="s" x="32" y="76">status in the pill · component under the rule · the guarantee each stage gives you</text>
+
+  <!-- 7 cards, 180 wide, 14 gap, starting x=32 -->
+  <!-- 1 Upload -->
+  <g transform="translate(32 104)">
+    <rect class="card" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28">01</text>
+    <text class="t" x="16" y="54">Upload</text>
+    <rect x="16" y="68" width="82" height="22" rx="11" fill="#1d2433"/><text class="st" x="26" y="83" fill="#9aa3b5">uploading</text>
+    <text class="s" x="16" y="118">Browser POSTs the file</text>
+    <text class="s" x="16" y="136">straight to S3 with a</text>
+    <text class="s" x="16" y="154">presigned POST.</text>
+    <text class="s" x="16" y="186">S3 enforces size range</text>
+    <text class="s" x="16" y="204">and video/* type.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">API · S3</text>
+    <text class="c" x="16" y="310">no bytes through API</text>
+  </g>
+  <path d="M214 270 H224" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 2 Verify -->
+  <g transform="translate(226 104)">
+    <rect class="card" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28">02</text>
+    <text class="t" x="16" y="54">Verify &amp; enqueue</text>
+    <rect x="16" y="68" width="76" height="22" rx="11" fill="#2a2312"/><text class="st" x="26" y="83" fill="#f5a524">uploaded</text>
+    <text class="s" x="16" y="118">/complete checks the</text>
+    <text class="s" x="16" y="136">object with HeadObject,</text>
+    <text class="s" x="16" y="154">records its real size.</text>
+    <text class="s" x="16" y="186">The row itself is now</text>
+    <text class="s" x="16" y="204">a queue entry.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">API · Postgres</text>
+    <text class="c" x="16" y="310">never trusts "done"</text>
+  </g>
+  <path d="M408 270 H418" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 3 Scale -->
+  <g transform="translate(420 104)">
+    <rect class="card" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28">03</text>
+    <text class="t" x="16" y="54">Scale out</text>
+    <rect x="16" y="68" width="76" height="22" rx="11" fill="#2a2312"/><text class="st" x="26" y="83" fill="#f5a524">uploaded</text>
+    <text class="s" x="16" y="118">Orchestrator counts the</text>
+    <text class="s" x="16" y="136">backlog every minute and</text>
+    <text class="s" x="16" y="154">launches Spot workers</text>
+    <text class="s" x="16" y="172">across every AZ and</text>
+    <text class="s" x="16" y="190">instance type.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">Lambda · EC2 Fleet</text>
+    <text class="c" x="16" y="310">zero idle compute</text>
+  </g>
+  <path d="M602 270 H612" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 4 Transcode -->
+  <g transform="translate(614 104)">
+    <rect class="card" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28">04</text>
+    <text class="t" x="16" y="54">Transcode</text>
+    <rect x="16" y="68" width="88" height="22" rx="11" fill="#141f38"/><text class="st" x="26" y="83" fill="#5b8cff">processing</text>
+    <text class="s" x="16" y="118">Claim with SKIP LOCKED,</text>
+    <text class="s" x="16" y="136">probe, then one decode</text>
+    <text class="s" x="16" y="154">feeding every ladder</text>
+    <text class="s" x="16" y="172">rung, capped to source.</text>
+    <text class="s" x="16" y="204">Heartbeat every 30 s.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">Worker · FFmpeg</text>
+    <text class="c" x="16" y="310">one owner, always</text>
+  </g>
+  <path d="M796 270 H806" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 5 Encrypt -->
+  <g transform="translate(808 104)">
+    <rect class="card" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28">05</text>
+    <text class="t" x="16" y="54">Encrypt &amp; package</text>
+    <rect x="16" y="68" width="88" height="22" rx="11" fill="#141f38"/><text class="st" x="26" y="83" fill="#5b8cff">processing</text>
+    <text class="s" x="16" y="118">Fresh AES-128 key,</text>
+    <text class="s" x="16" y="136">wrapped by KMS, bound</text>
+    <text class="s" x="16" y="154">to the video id.</text>
+    <text class="s" x="16" y="186">HLS segments, poster,</text>
+    <text class="s" x="16" y="204">sprite thumbnails.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">Worker · KMS · S3</text>
+    <text class="c" x="16" y="310">key never stored raw</text>
+  </g>
+  <path d="M990 270 H1000" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 6 Ready -->
+  <g transform="translate(1002 104)">
+    <rect class="ready" width="180" height="330" rx="12"/>
+    <text class="n" x="16" y="28" style="fill:#34d399">06</text>
+    <text class="t" x="16" y="54">Ready</text>
+    <rect x="16" y="68" width="56" height="22" rx="11" fill="#173328"/><text class="st" x="26" y="83" fill="#34d399">ready</text>
+    <text class="s" x="16" y="118">One transaction: flip</text>
+    <text class="s" x="16" y="136">to ready, record</text>
+    <text class="s" x="16" y="154">renditions, queue the</text>
+    <text class="s" x="16" y="172">captions + MP4 jobs,</text>
+    <text class="s" x="16" y="190">meter usage, write the</text>
+    <text class="s" x="16" y="208">video.ready webhook.</text>
+    <line class="rule" x1="16" y1="268" x2="164" y2="268"/>
+    <text class="c" x="16" y="290">Postgres outbox</text>
+    <text class="c" x="16" y="310">all or nothing</text>
+  </g>
+  <path d="M1184 270 H1194" stroke="#3b4a66" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- 7 Play -->
+  <g transform="translate(1196 104)">
+    <rect class="play" width="172" height="330" rx="12"/>
+    <text class="n" x="16" y="28">07</text>
+    <text class="t" x="16" y="54">Play</text>
+    <rect x="16" y="68" width="64" height="22" rx="11" fill="#141f38"/><text class="st" x="26" y="83" fill="#5b8cff">session</text>
+    <text class="s" x="16" y="118">Your backend mints a</text>
+    <text class="s" x="16" y="136">session. The player gets</text>
+    <text class="s" x="16" y="154">tokenized playlists, the</text>
+    <text class="s" x="16" y="172">key from a token-gated</text>
+    <text class="s" x="16" y="190">endpoint, and signed</text>
+    <text class="s" x="16" y="208">segment URLs.</text>
+    <line class="rule" x1="16" y1="268" x2="156" y2="268"/>
+    <text class="c" x="16" y="290">API · CloudFront</text>
+    <text class="c" x="16" y="310">revocable instantly</text>
+  </g>
+</svg>

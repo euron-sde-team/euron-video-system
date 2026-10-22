@@ -1,0 +1,41 @@
+{
+  "name": "euron-video-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted video transcoding and secure HLS playback platform: FFmpeg ABR ladders, AES-128 envelope encryption with KMS, tokenized key delivery, Postgres-as-queue, EC2 Spot autoscaling, Terraform, and a local AWS emulator for demos.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "tsx db/migrate.ts",
+    "db:codegen": "kysely-codegen --dialect postgres --out-file packages/core/src/db/types.ts",
+    "evs": "tsx scripts/evs.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.15.6",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.39.1",
+    "kysely": "^0.28.8",
+    "kysely-codegen": "^0.20.0",
+    "pg": "^8.16.3",
+    "prettier": "^3.4.2",
+    "tsx": "^4.21.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.47.0",
+    "vitest": "^2.1.8"
+  }
+}

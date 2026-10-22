@@ -1,0 +1,30 @@
+{
+  "name": "@evs/orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Autoscaler: reaps stale claims and launches EC2 Spot workers from the queue backlog. Runs as a scheduled Lambda or as a local loop.",
+  "scripts": {
+    "dev": "EVS_SERVICE=orchestrator tsx watch src/local.ts",
+    "build": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/lambda/index.js --external:@aws-sdk/* --external:pg-native && node -e \"require('fs').writeFileSync('dist/lambda/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\" && esbuild src/local.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/local.js --external:pg-native --sourcemap --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "start": "node dist/local.js",
+    "lint": "eslint src test",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.700.0",
+    "@evs/core": "workspace:*",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.15.6",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "kysely": "^0.28.8",
+    "ulid": "^2.3.0"
+  }
+}

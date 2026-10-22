@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Overlay: local containers against REAL AWS resources.
+#
+# Provision first with infra/terraform/envs/aws-dev, then copy its outputs into
+# deploy/compose/.env.aws (see .env.aws.example). Credentials come from your
+# AWS CLI profile, mounted read-only. Nothing here ever holds a static key.
+# ─────────────────────────────────────────────────────────────────────────────
+x-aws-env: &aws-env
+  EVS_CLOUD: aws
+  AWS_PROFILE: ${AWS_PROFILE:-default}
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_SDK_LOAD_CONFIG: "1"
+
+services:
+  migrate:
+    env_file: [.env.aws]
+    environment:
+      <<: *aws-env
+    volumes:
+      - ${HOME}/.aws:/root/.aws:ro
+
+  api:
+    env_file: [.env.aws]
+    environment:
+      <<: *aws-env
+      DELIVERY_DRIVER: cloudfront-signed
+    volumes:
+      - ${HOME}/.aws:/home/node/.aws:ro
+
+  worker:
+    env_file: [.env.aws]
+    environment:
+      <<: *aws-env
+    volumes:
+      - ${HOME}/.aws:/home/node/.aws:ro

@@ -1,0 +1,965 @@
+openapi: 3.1.0
+info:
+  title: Euron Video System API
+  version: 0.1.0
+  summary: Video transcoding control plane and secure HLS playback.
+  description: |
+    Two surfaces, two authentication models:
+
+    * **Management API** (`/v1/*` except `/v1/play`): called by your backend and the
+      operator console with a scoped API key, `Authorization: Bearer evs_<prefix>_<secret>`.
+    * **Playback API** (`/v1/play/*`): called by viewers' players with a short-lived
+      playback token, minted by your backend via `POST /v1/videos/{id}/playback-sessions`.
+      The token travels as `?token=` (native Apple HLS cannot send headers) or as a Bearer header.
+
+    Every response carries `X-Request-Id`. Errors share one shape (`Error`), and the
+    request id in the body matches the header and the server log line.
+
+    Delivery is at-least-once for webhooks; dedupe on `EVS-Event-Id`.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8080
+    description: Local (docker compose)
+  - url: https://video-api.example.com
+    description: Your deployment
+tags:
+  - name: System
+  - name: Videos
+  - name: Playback sessions
+  - name: Playback delivery
+  - name: Playback policies
+  - name: API keys
+  - name: Webhooks
+  - name: Audit
+  - name: Usage
+security:
+  - apiKey: []
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [System]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Process is serving
+          content:
+            application/json:
+              schema: { type: object, properties: { status: { type: string, const: ok } } }
+  /readyz:
+    get:
+      operationId: getReadiness
+      tags: [System]
+      summary: Readiness probe (database reachable)
+      security: []
+      responses:
+        "200": { description: Ready }
+        "503": { description: A dependency is unavailable }
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [System]
+      summary: Prometheus metrics
+      security: []
+      responses:
+        "200":
+          description: Prometheus text exposition format
+          content: { text/plain: { schema: { type: string } } }
+  /v1/openapi.yaml:
+    get:
+      operationId: getOpenApi
+      tags: [System]
+      summary: This document
+      security: []
+      responses:
+        "200": { description: OpenAPI 3.1 YAML, content: { application/yaml: { schema: { type: string } } } }
+
+  /v1/me:
+    get:
+      operationId: getMe
+      tags: [API keys]
+      summary: Identify the calling API key
+      responses:
+        "200":
+          description: The authenticated key
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey]
+                properties:
+                  apiKey:
+                    type: object
+                    properties:
+                      id: { type: string, examples: [key_01JABCDEF0123456789ABCDEFG] }
+                      name: { type: string, examples: [backend] }
+                      prefix: { type: string, examples: [ab12cd34] }
+                      scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+                      createdAt: { type: string, format: date-time }
+                      expiresAt: { type: [string, "null"], format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /v1/stats:
+    get:
+      operationId: getStats
+      tags: [Videos]
+      summary: Catalog, storage and queue overview
+      description: "Scope: `videos:read`."
+      responses:
+        "200":
+          description: Dashboard numbers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/videos:
+    post:
+      operationId: createVideo
+      tags: [Videos]
+      summary: Create a video and get a presigned upload
+      description: |
+        Scope: `videos:write`. Returns a presigned POST: send a `multipart/form-data`
+        request to `upload.url` with every field in `upload.fields`, a `Content-Type`
+        field starting with `video/`, and the file as the LAST field named `file`.
+        Then call `POST /v1/videos/{id}/complete`. Emits `video.created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVideoRequest" }
+            example: { title: "Product walkthrough", filename: walkthrough.mp4, externalRef: "asset-42", metadata: { team: growth } }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [video, upload]
+                properties:
+                  video: { $ref: "#/components/schemas/Video" }
+                  upload: { $ref: "#/components/schemas/PresignedUpload" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    get:
+      operationId: listVideos
+      tags: [Videos]
+      summary: List videos
+      description: "Scope: `videos:read`. Newest first."
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/VideoStatus" } }
+        - { name: q, in: query, description: "Search title and externalRef, or match an exact id", schema: { type: string, maxLength: 200 } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: A page of videos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Video" } }
+                  pagination: { $ref: "#/components/schemas/Pagination" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /v1/videos/{id}:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    get:
+      operationId: getVideo
+      tags: [Videos]
+      summary: Get a video (with renditions)
+      description: "Scope: `videos:read`."
+      responses:
+        "200": { description: The video, content: { application/json: { schema: { $ref: "#/components/schemas/Video" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateVideo
+      tags: [Videos]
+      summary: Update title, metadata, externalRef or playback policy
+      description: "Scope: `videos:write`."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: { type: string, minLength: 1, maxLength: 300 }
+                externalRef: { type: [string, "null"], maxLength: 200 }
+                metadata: { type: object, additionalProperties: true }
+                playbackPolicyId: { type: [string, "null"] }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/Video" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteVideo
+      tags: [Videos]
+      summary: Delete a video and all of its stored objects
+      description: "Scope: `videos:write`. Soft-deletes the row, cancels processing, removes media, download and source objects. Emits `video.deleted`."
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/videos/{id}/complete:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    post:
+      operationId: completeVideoUpload
+      tags: [Videos]
+      summary: Confirm the upload and enqueue transcoding
+      description: "Scope: `videos:write`. The server verifies the object exists (HeadObject) before enqueueing. Emits `video.uploaded`."
+      responses:
+        "200": { description: Enqueued (status `uploaded`), content: { application/json: { schema: { $ref: "#/components/schemas/Video" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+
+  /v1/videos/{id}/retry:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    post:
+      operationId: retryVideo
+      tags: [Videos]
+      summary: Requeue a failed video
+      description: "Scope: `videos:write`. Only `failed` videos; attempts reset to 0."
+      responses:
+        "200": { description: Requeued, content: { application/json: { schema: { $ref: "#/components/schemas/Video" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/videos/{id}/cancel:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    post:
+      operationId: cancelVideo
+      tags: [Videos]
+      summary: Cancel a video that is not yet ready
+      description: "Scope: `videos:write`. Safe mid-transcode: the worker aborts within one heartbeat. Emits `video.cancelled`."
+      responses:
+        "200": { description: Cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/Video" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/videos/{id}/download:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    get:
+      operationId: getVideoDownload
+      tags: [Videos]
+      summary: Presigned URL for the processed MP4
+      description: "Scope: `videos:read`. 404 until `download.status` is `ready`. URL valid for 5 minutes."
+      responses:
+        "200":
+          description: Download link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  expiresAt: { type: string, format: date-time }
+                  filename: { type: string, examples: [Product_walkthrough.mp4] }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/videos/{id}/playback-sessions:
+    parameters: [{ $ref: "#/components/parameters/VideoId" }]
+    post:
+      operationId: createPlaybackSession
+      tags: [Playback sessions]
+      summary: Mint a playback session for one viewer
+      description: |
+        Scope: `playback:mint`. Call this from YOUR backend after your own entitlement
+        check; hand the returned URLs to the player. The video's playback policy (or the
+        default) is applied: TTL clamping, origin allowlist, and per-viewer concurrency
+        (exceeding the limit revokes the viewer's oldest sessions).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [viewerId]
+              additionalProperties: false
+              properties:
+                viewerId: { type: string, maxLength: 200, description: Your opaque identifier for the viewer, examples: [user_8812] }
+                ttlSeconds: { type: integer, minimum: 10, maximum: 86400, description: Clamped to the policy maximum }
+                origin: { type: string, format: uri, description: Embedding page origin; required when the policy has an allowlist, examples: ["https://app.example.com"] }
+      responses:
+        "201": { description: Minted, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackSessionMinted" } } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+
+  /v1/playback-sessions:
+    get:
+      operationId: listPlaybackSessions
+      tags: [Playback sessions]
+      summary: List playback sessions
+      description: "Scope: `playback:mint`."
+      parameters:
+        - { name: videoId, in: query, schema: { type: string } }
+        - { name: viewerId, in: query, schema: { type: string } }
+        - { name: active, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: A page of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PlaybackSession" } }
+                  pagination: { $ref: "#/components/schemas/Pagination" }
+  /v1/playback-sessions/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    delete:
+      operationId: revokePlaybackSession
+      tags: [Playback sessions]
+      summary: Revoke a session
+      description: "Scope: `playback:mint`. Playlists and keys stop being served within 5 seconds on every instance."
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackSession" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/play/{videoId}/master.m3u8:
+    parameters: [{ $ref: "#/components/parameters/PlayVideoId" }, { $ref: "#/components/parameters/PlaybackToken" }]
+    get:
+      operationId: getMasterPlaylist
+      tags: [Playback delivery]
+      summary: Master playlist (rewritten per request)
+      security: [{ playbackToken: [] }]
+      responses:
+        "200": { description: HLS master playlist with tokenized variant URLs, content: { application/vnd.apple.mpegurl: { schema: { type: string } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/play/{videoId}/{rung}/index.m3u8:
+    parameters:
+      - { $ref: "#/components/parameters/PlayVideoId" }
+      - { name: rung, in: path, required: true, schema: { type: string, pattern: "^[0-9]{2,4}$" }, examples: { p720: { value: "720" } } }
+      - { $ref: "#/components/parameters/PlaybackToken" }
+    get:
+      operationId: getVariantPlaylist
+      tags: [Playback delivery]
+      summary: Variant playlist (key URI tokenized, segments signed)
+      security: [{ playbackToken: [] }]
+      responses:
+        "200": { description: HLS media playlist, content: { application/vnd.apple.mpegurl: { schema: { type: string } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /v1/play/{videoId}/key:
+    parameters: [{ $ref: "#/components/parameters/PlayVideoId" }, { $ref: "#/components/parameters/PlaybackToken" }]
+    get:
+      operationId: getContentKey
+      tags: [Playback delivery]
+      summary: AES-128 content key (16 raw bytes)
+      security: [{ playbackToken: [] }]
+      responses:
+        "200": { description: "Key bytes; never cached", content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/play/{videoId}/thumbnails.vtt:
+    parameters: [{ $ref: "#/components/parameters/PlayVideoId" }, { $ref: "#/components/parameters/PlaybackToken" }]
+    get:
+      operationId: getThumbnails
+      tags: [Playback delivery]
+      summary: Seek-preview thumbnails (WebVTT with signed sprite URLs)
+      security: [{ playbackToken: [] }]
+      responses:
+        "200": { description: WebVTT, content: { text/vtt: { schema: { type: string } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/play/{videoId}/poster.jpg:
+    parameters: [{ $ref: "#/components/parameters/PlayVideoId" }, { $ref: "#/components/parameters/PlaybackToken" }]
+    get:
+      operationId: getPoster
+      tags: [Playback delivery]
+      summary: Poster image
+      security: [{ playbackToken: [] }]
+      responses:
+        "302": { description: Redirect to a signed URL }
+        "200": { description: The image (proxy delivery), content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /v1/play/{videoId}/media/{path}:
+    parameters:
+      - { $ref: "#/components/parameters/PlayVideoId" }
+      - { name: path, in: path, required: true, description: "Object path under the video (hls/... or thumbnails/...)", schema: { type: string } }
+      - { $ref: "#/components/parameters/PlaybackToken" }
+    get:
+      operationId: getMediaObject
+      tags: [Playback delivery]
+      summary: Media object (proxy delivery driver only)
+      security: [{ playbackToken: [] }]
+      responses:
+        "200": { description: "Segment, sprite or subtitle bytes" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/playback-policies:
+    get:
+      operationId: listPlaybackPolicies
+      tags: [Playback policies]
+      summary: List policies
+      description: "Scope: `videos:read`."
+      responses:
+        "200":
+          description: All policies, default first
+          content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/PlaybackPolicy" } } } } } }
+    post:
+      operationId: createPlaybackPolicy
+      tags: [Playback policies]
+      summary: Create a policy
+      description: "Scope: `policies:manage`. Set `isDefault: true` to make it the default atomically."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaybackPolicyInput" }
+            example: { name: partner-embeds, tokenTtlSeconds: 300, maxTokenTtlSeconds: 1800, allowedOrigins: ["https://app.example.com"], maxConcurrentSessions: 2 }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackPolicy" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/playback-policies/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getPlaybackPolicy
+      tags: [Playback policies]
+      summary: Get a policy
+      description: "Scope: `videos:read`."
+      responses:
+        "200": { description: The policy, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackPolicy" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updatePlaybackPolicy
+      tags: [Playback policies]
+      summary: Update a policy
+      description: "Scope: `policies:manage`. The default cannot be un-set directly; make another policy default."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackPolicyInput" } } }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/PlaybackPolicy" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deletePlaybackPolicy
+      tags: [Playback policies]
+      summary: Delete a policy
+      description: "Scope: `policies:manage`. The default policy cannot be deleted. Videos using it fall back to the default."
+      responses:
+        "204": { description: Deleted }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/api-keys:
+    get:
+      operationId: listApiKeys
+      tags: [API keys]
+      summary: List API keys
+      description: "Scope: `keys:manage`. Secrets are never returned."
+      parameters:
+        - { name: includeRevoked, in: query, schema: { type: string, enum: ["true", "false"] } }
+      responses:
+        "200":
+          description: Keys
+          content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/ApiKey" } } } } } }
+    post:
+      operationId: createApiKey
+      tags: [API keys]
+      summary: Create an API key
+      description: |
+        Scope: `keys:manage`. The secret is returned ONCE. A key can only grant scopes
+        its creator holds (403 otherwise); only `*` keys can mint `*` keys.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scopes]
+              additionalProperties: false
+              properties:
+                name: { type: string, maxLength: 100, examples: [ci-uploader] }
+                scopes: { type: array, minItems: 1, items: { $ref: "#/components/schemas/Scope" } }
+                expiresAt: { type: [string, "null"], format: date-time }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiKey: { $ref: "#/components/schemas/ApiKey" }
+                  secret: { type: string, examples: [evs_ab12cd34_EXAMPLEexampleEXAMPLEexampleEXAMPLEexamp] }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /v1/api-keys/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    delete:
+      operationId: revokeApiKey
+      tags: [API keys]
+      summary: Revoke an API key
+      description: "Scope: `keys:manage`. A key cannot revoke itself. Other instances stop accepting it within 30 seconds."
+      responses:
+        "204": { description: Revoked }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/webhooks:
+    get:
+      operationId: listWebhooks
+      tags: [Webhooks]
+      summary: List endpoints
+      description: "Scope: `webhooks:manage`."
+      responses:
+        "200":
+          description: Endpoints
+          content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/WebhookEndpoint" } } } } } }
+    post:
+      operationId: createWebhook
+      tags: [Webhooks]
+      summary: Register an endpoint
+      description: |
+        Scope: `webhooks:manage`. Returns `signingSecret` ONCE. In production the URL must
+        be https and must not resolve to a private, loopback or link-local address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              additionalProperties: false
+              properties:
+                url: { type: string, format: uri, examples: ["https://hooks.example.com/evs"] }
+                events: { type: array, minItems: 1, items: { $ref: "#/components/schemas/EventType" } }
+                description: { type: [string, "null"], maxLength: 500 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/WebhookEndpoint" }
+                  - { type: object, properties: { signingSecret: { type: string, examples: [whsec_EXAMPLEexampleEXAMPLE] } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /v1/webhooks/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getWebhook
+      tags: [Webhooks]
+      summary: Get an endpoint
+      responses:
+        "200": { description: Endpoint, content: { application/json: { schema: { $ref: "#/components/schemas/WebhookEndpoint" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateWebhook
+      tags: [Webhooks]
+      summary: Update an endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                url: { type: string, format: uri }
+                events: { type: array, items: { $ref: "#/components/schemas/EventType" } }
+                description: { type: [string, "null"] }
+                enabled: { type: boolean }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/WebhookEndpoint" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteWebhook
+      tags: [Webhooks]
+      summary: Delete an endpoint (and its delivery history)
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/webhooks/{id}/test:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: testWebhook
+      tags: [Webhooks]
+      summary: Send a `webhook.test` event to this endpoint
+      responses:
+        "202": { description: Queued, content: { application/json: { schema: { $ref: "#/components/schemas/WebhookDelivery" } } } }
+  /v1/webhooks/{id}/deliveries:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listWebhookDeliveries
+      tags: [Webhooks]
+      summary: Delivery history for an endpoint
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Deliveries, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/WebhookDelivery" } }
+                  pagination: { $ref: "#/components/schemas/Pagination" }
+  /v1/webhook-deliveries/{id}/redeliver:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: redeliverWebhook
+      tags: [Webhooks]
+      summary: Redeliver an event (same event id)
+      responses:
+        "202": { description: Re-armed, content: { application/json: { schema: { $ref: "#/components/schemas/WebhookDelivery" } } } }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/audit-events:
+    get:
+      operationId: listAuditEvents
+      tags: [Audit]
+      summary: Query the append-only audit log
+      description: "Scope: `audit:read`. Newest first, cursor-paginated (pass `nextCursor` back as `cursor`)."
+      parameters:
+        - { name: action, in: query, schema: { type: string, examples: [video.delete] } }
+        - { name: resourceType, in: query, schema: { type: string, examples: [video] } }
+        - { name: resourceId, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } }
+                  nextCursor: { type: [string, "null"] }
+
+  /v1/usage:
+    get:
+      operationId: getUsage
+      tags: [Usage]
+      summary: Daily usage rollup
+      description: "Scope: `usage:read`. Defaults to the last 30 days; at most 366 days."
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date, examples: ["2026-01-01"] } }
+        - { name: to, in: query, schema: { type: string, format: date, examples: ["2026-01-31"] } }
+      responses:
+        "200":
+          description: Usage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  days: { type: array, items: { $ref: "#/components/schemas/UsageDay" } }
+                  totals: { $ref: "#/components/schemas/UsageTotals" }
+
+webhooks:
+  videoEvent:
+    post:
+      operationId: receiveEvent
+      summary: Event delivered to your registered endpoint
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/WebhookEvent" } } }
+      responses:
+        "200": { description: Any 2xx acknowledges the delivery; anything else is retried with backoff }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      bearerFormat: "evs_<prefix>_<secret>"
+      description: Scoped API key. Create the first one with `pnpm evs keys:create --name root --scopes '*'`.
+    playbackToken:
+      type: apiKey
+      in: query
+      name: token
+      description: Short-lived playback JWT from POST /v1/videos/{id}/playback-sessions. A Bearer header also works.
+
+  parameters:
+    VideoId: { name: id, in: path, required: true, schema: { type: string, examples: [01JABCDEF0123456789ABCDEFG] } }
+    PlayVideoId: { name: videoId, in: path, required: true, schema: { type: string } }
+    PlaybackToken: { name: token, in: query, required: false, schema: { type: string } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+
+  responses:
+    BadRequest: { description: Validation failed, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Unauthorized: { description: "Missing, invalid, revoked or expired credentials", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Forbidden: { description: "Authenticated but not allowed (scope, origin, video binding)", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    NotFound: { description: Not found, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Conflict: { description: Invalid state transition, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Unprocessable: { description: Semantically invalid request, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    RateLimited: { description: Rate limit or in-flight cap exceeded, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string, enum: [bad_request, validation_failed, unauthorized, forbidden, not_found, conflict, unprocessable, rate_limited, payload_too_large, internal] }
+            message: { type: string }
+            requestId: { type: string, examples: [req_01JABCDEF0123456789ABCDEFG] }
+            details: { type: object, additionalProperties: true }
+      example:
+        error: { code: forbidden, message: "This API key lacks the required scope: videos:write", requestId: req_01JABCDEF0123456789ABCDEFG, details: { required: ["videos:write"] } }
+
+    Scope:
+      type: string
+      enum: ["videos:read", "videos:write", "playback:mint", "policies:manage", "webhooks:manage", "keys:manage", "audit:read", "usage:read", "*"]
+    EventType:
+      type: string
+      enum: [video.created, video.uploaded, video.ready, video.failed, video.cancelled, video.deleted, captions.ready, download.ready, "*"]
+    VideoStatus:
+      type: string
+      enum: [uploading, uploaded, processing, ready, failed, cancelled]
+    ArtifactStatus:
+      type: string
+      enum: [pending, processing, ready, failed, skipped]
+
+    Pagination:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+
+    CreateVideoRequest:
+      type: object
+      required: [title, filename]
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+        filename: { type: string, description: "Original filename; its extension must be mp4, mov, mkv, webm or m4v" }
+        externalRef: { type: [string, "null"], maxLength: 200, description: Your own id for this asset }
+        metadata: { type: object, additionalProperties: true, description: "Free-form JSON, up to 16 KB" }
+        playbackPolicyId: { type: [string, "null"] }
+        captions: { type: boolean, default: true, description: Generate speech-to-text captions }
+
+    PresignedUpload:
+      type: object
+      properties:
+        url: { type: string, format: uri, examples: ["https://example-uploads.s3.amazonaws.com/"] }
+        fields: { type: object, additionalProperties: { type: string } }
+        expiresAt: { type: string, format: date-time }
+
+    Video:
+      type: object
+      properties:
+        id: { type: string, examples: [01JABCDEF0123456789ABCDEFG] }
+        title: { type: string }
+        externalRef: { type: [string, "null"] }
+        metadata: { type: object, additionalProperties: true }
+        status: { $ref: "#/components/schemas/VideoStatus" }
+        stage: { type: [string, "null"], enum: [transcoding, packaging, uploading_output, null] }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        orientation: { type: [string, "null"], enum: [landscape, portrait, square, null] }
+        durationSeconds: { type: [integer, "null"] }
+        protection: { type: string, enum: [none, aes_128, drm_cbcs] }
+        watermark: { type: string, enum: [none, dynamic_overlay, forensic_ab] }
+        playbackPolicyId: { type: [string, "null"] }
+        captions:
+          type: object
+          properties:
+            status: { $ref: "#/components/schemas/ArtifactStatus" }
+            languages: { type: array, items: { type: string }, examples: [[en]] }
+        download:
+          type: object
+          properties: { status: { $ref: "#/components/schemas/ArtifactStatus" } }
+        sourceBytes: { type: [integer, "null"] }
+        outputBytes: { type: [integer, "null"] }
+        error: { type: [string, "null"] }
+        attempts: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        readyAt: { type: [string, "null"], format: date-time }
+        posterUrl: { type: [string, "null"], format: uri, description: Short-lived signed URL when ready }
+        renditions:
+          type: array
+          description: Present on GET /v1/videos/{id}
+          items:
+            type: object
+            properties:
+              label: { type: string, examples: ["720"] }
+              width: { type: integer }
+              height: { type: integer }
+              bitrateKbps: { type: integer }
+              codec: { type: string, examples: [avc1.64001f] }
+
+    Stats:
+      type: object
+      properties:
+        videos:
+          type: object
+          properties:
+            total: { type: integer }
+            byStatus: { type: object, additionalProperties: { type: integer } }
+        storage:
+          type: object
+          properties:
+            sourceBytes: { type: integer }
+            outputBytes: { type: integer }
+        queue:
+          type: object
+          properties:
+            queued: { type: integer }
+            processing: { type: integer }
+            jobsQueued: { type: integer }
+            jobsProcessing: { type: integer }
+        activeSessions: { type: integer }
+
+    PlaybackSessionMinted:
+      type: object
+      properties:
+        sessionId: { type: string, examples: [ps_01JABCDEF0123456789ABCDEFG] }
+        token: { type: string, description: "HS256 JWT bound to viewer, video and session" }
+        expiresAt: { type: string, format: date-time }
+        manifestUrl: { type: string, format: uri, examples: ["https://video-api.example.com/v1/play/01JABC/master.m3u8?token=eyJ..."] }
+        thumbnailsUrl: { type: string, format: uri }
+        posterUrl: { type: string, format: uri }
+        downloadUrl:
+          type: [string, "null"]
+          format: uri
+          description: >-
+            Presigned URL for the processed MP4, expiring with the session. Present only when
+            the video's playback policy sets allowDownload and the MP4 is ready; otherwise null.
+        watermark:
+          type: object
+          properties:
+            required: { type: boolean }
+            text: { type: string, description: Rendered by the player as a moving overlay }
+
+    PlaybackSession:
+      type: object
+      properties:
+        id: { type: string }
+        videoId: { type: string }
+        viewerId: { type: string }
+        policyId: { type: [string, "null"] }
+        origin: { type: [string, "null"] }
+        userAgent: { type: [string, "null"] }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        revokedReason: { type: [string, "null"], examples: [concurrency_limit, revoked_by_api] }
+        active: { type: boolean }
+
+    PlaybackPolicyInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 100 }
+        tokenTtlSeconds: { type: integer, minimum: 10, maximum: 86400, default: 300 }
+        maxTokenTtlSeconds: { type: integer, minimum: 10, maximum: 86400, default: 3600 }
+        allowedOrigins: { type: array, items: { type: string, format: uri }, description: Empty means any origin }
+        maxConcurrentSessions: { type: integer, minimum: 0, maximum: 1000, default: 0, description: 0 means unlimited }
+        watermarkRequired: { type: boolean, default: true }
+        allowDownload: { type: boolean, default: false }
+        isDefault: { type: boolean }
+
+    PlaybackPolicy:
+      allOf:
+        - { $ref: "#/components/schemas/PlaybackPolicyInput" }
+        - type: object
+          properties:
+            id: { type: string, examples: [pol_01JABCDEF0123456789ABCDEFG] }
+            isDefault: { type: boolean }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    ApiKey:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        prefix: { type: string, examples: [ab12cd34] }
+        scopes: { type: array, items: { $ref: "#/components/schemas/Scope" } }
+        createdBy: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: [string, "null"], format: date-time }
+        revokedAt: { type: [string, "null"], format: date-time }
+        lastUsedAt: { type: [string, "null"], format: date-time }
+
+    WebhookEndpoint:
+      type: object
+      properties:
+        id: { type: string, examples: [wh_01JABCDEF0123456789ABCDEFG] }
+        url: { type: string, format: uri }
+        description: { type: [string, "null"] }
+        events: { type: array, items: { $ref: "#/components/schemas/EventType" } }
+        enabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id: { type: string }
+        endpointId: { type: string }
+        eventId: { type: string, examples: [evt_01JABCDEF0123456789ABCDEFG] }
+        eventType: { type: string }
+        status: { type: string, enum: [pending, delivering, delivered, failed] }
+        attempts: { type: integer }
+        maxAttempts: { type: integer }
+        nextAttemptAt: { type: string, format: date-time }
+        lastStatusCode: { type: [integer, "null"] }
+        lastError: { type: [string, "null"] }
+        deliveredAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    WebhookEvent:
+      description: |
+        Body POSTed to your endpoint. Headers: `EVS-Event-Id`, `EVS-Event-Type`,
+        `EVS-Delivery-Id`, and `EVS-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        createdAt: { type: string, format: date-time }
+        data: { type: object, additionalProperties: true }
+      example: { id: evt_01JABCDEF0123456789ABCDEFG, type: video.ready, createdAt: "2026-01-01T12:00:00.000Z", data: { videoId: 01JABCDEF0123456789ABCDEFG, durationSeconds: 642, renditions: ["1080", "720", "480"] } }
+
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string }
+        actor: { type: object, properties: { type: { type: string, enum: [api_key, system, cli] }, id: { type: [string, "null"] } } }
+        action: { type: string, examples: [video.create] }
+        resource: { type: object, properties: { type: { type: string }, id: { type: [string, "null"] } } }
+        requestId: { type: [string, "null"] }
+        metadata: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+
+    UsageDay:
+      type: object
+      properties:
+        day: { type: string, format: date }
+        videosCreated: { type: integer }
+        transcodeSeconds: { type: integer }
+        playbackSessions: { type: integer }
+        keyDeliveries: { type: integer }
+    UsageTotals:
+      type: object
+      properties:
+        videosCreated: { type: integer }
+        transcodeSeconds: { type: integer }
+        playbackSessions: { type: integer }
+        keyDeliveries: { type: integer }

@@ -1,0 +1,23 @@
+{
+  "name": "@evs/player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Embeddable React player for Euron Video System: hls.js with native-HLS fallback on Apple WebKit, tokenized AES-128 playback, VTT sprite thumbnails, quality and speed menus, dynamic watermark.",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "peerDependencies": { "react": "^18.3.1", "react-dom": "^18.3.1" },
+  "dependencies": { "hls.js": "^1.6.16", "clsx": "^2.1.1", "lucide-react": "^0.456.0" },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

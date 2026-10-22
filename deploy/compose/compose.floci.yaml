@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Overlay: emulated AWS with Floci (https://github.com/floci-io/floci, MIT).
+#
+# The SAME Terraform that provisions real AWS (infra/terraform/modules) runs
+# here against the emulator: the `terraform` one-shot applies
+# infra/terraform/envs/local-floci before any service starts.
+#
+# Delivery defaults to `proxy` (the API streams segments after verifying the
+# playback token). Set EVS_DELIVERY_DRIVER=presigned to exercise S3 presigned
+# delivery against the emulator instead.
+# ─────────────────────────────────────────────────────────────────────────────
+x-floci-env: &floci-env
+  EVS_CLOUD: floci
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_ENDPOINT_URL: http://floci:4566
+  S3_FORCE_PATH_STYLE: "true"
+  S3_PUBLIC_ENDPOINT: http://localhost:4566
+  UPLOADS_BUCKET: evs-local-uploads
+  MEDIA_BUCKET: evs-local-media
+  DOWNLOADS_BUCKET: evs-local-downloads
+  KMS_KEY_ID: alias/evs-local
+
+services:
+  floci:
+    image: floci/floci:2.3.0
+    environment:
+      FLOCI_HOSTNAME: floci
+      FLOCI_DEFAULT_REGION: us-east-1
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /data
+    ports:
+      - "127.0.0.1:${EVS_FLOCI_PORT:-4566}:4566"
+    volumes:
+      - flocidata:/data
+      # Only Docker-backed emulated services (Lambda, ECS, RDS) need the
+      # Docker socket. This stack uses S3, KMS and Secrets Manager, so it
+      # stays unmounted. Uncomment to experiment with emulated Lambda.
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+  # One-shot: provision buckets, CORS, KMS key and secrets inside Floci.
+  terraform:
+    image: hashicorp/terraform:1.16.6
+    working_dir: /infra/envs/local-floci
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "waiting for floci..."
+        until wget -q -O /dev/null http://floci:4566/; do sleep 1; done
+        terraform init -input=false -no-color >/dev/null
+        terraform apply -input=false -auto-approve -no-color -var endpoint=http://floci:4566 -var cors_origins='["http://localhost:${EVS_CONSOLE_PORT:-3000}","http://127.0.0.1:${EVS_CONSOLE_PORT:-3000}","http://localhost:${EVS_API_PORT:-8080}"]'
+        terraform output -no-color
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+      TF_IN_AUTOMATION: "1"
+    volumes:
+      - ../../infra/terraform:/infra
+    depends_on:
+      - floci
+    restart: "no"
+
+  migrate:
+    environment:
+      <<: *floci-env
+    depends_on:
+      terraform:
+        condition: service_completed_successfully
+
+  api:
+    environment:
+      <<: *floci-env
+      DELIVERY_DRIVER: ${EVS_DELIVERY_DRIVER:-proxy}
+      # Local demo only: lets webhooks reach the in-network receiver below while
+      # the API runs with NODE_ENV=production. Refused by config on EVS_CLOUD=aws.
+      WEBHOOK_ALLOW_PRIVATE_TARGETS: "true"
+    depends_on:
+      terraform:
+        condition: service_completed_successfully
+
+  worker:
+    environment:
+      <<: *floci-env
+    depends_on:
+      terraform:
+        condition: service_completed_successfully
+
+  # Reference webhook receiver (examples/webhook-receiver). Register
+  # http://webhook-receiver:9099/events as an endpoint, then restart this
+  # service with WEBHOOK_SIGNING_SECRET set to the secret shown once at creation.
+  webhook-receiver:
+    image: node:22.23.4-bookworm-slim
+    command: ["node", "/app/server.mjs"]
+    user: node
+    environment:
+      PORT: "9099"
+      WEBHOOK_SIGNING_SECRET: ${EVS_WEBHOOK_SIGNING_SECRET:-}
+    volumes:
+      - ../../examples/webhook-receiver:/app:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9099/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  flocidata:

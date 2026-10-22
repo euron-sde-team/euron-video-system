@@ -1,0 +1,25 @@
+{
+  "name": "@evs/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Transcode worker: claims videos from the Postgres queue, builds an ABR ladder with FFmpeg, packages AES-128 HLS, generates thumbnails, captions and a downloadable MP4.",
+  "scripts": {
+    "dev": "EVS_SERVICE=worker tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js --external:pg-native --sourcemap --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "start": "node dist/index.js",
+    "lint": "eslint src test",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@evs/core": "workspace:*",
+    "kysely": "^0.28.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}
