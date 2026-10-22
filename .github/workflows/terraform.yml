@@ -19,7 +19,7 @@ jobs:
       matrix:
         env: [local-floci, aws-dev, aws-prod]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.6
@@ -30,7 +30,7 @@ jobs:
   tflint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: terraform-linters/setup-tflint@v4
       - run: tflint --init
         working-directory: infra/terraform
@@ -40,7 +40,7 @@ jobs:
   checkov:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Checkov (any unskipped finding fails)
         uses: bridgecrewio/checkov-action@v12
         with:
