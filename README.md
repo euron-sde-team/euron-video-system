@@ -60,6 +60,7 @@ on a laptop against an AWS emulator, and on real AWS from the same Terraform.
 
 - [Why EVS](#-why-evs)
 - [At a glance](#-at-a-glance)
+- [Screenshots](#️-screenshots)
 - [Features](#-features)
 - [Architecture](#️-architecture)
   - [The life of a video](#the-life-of-a-video)
@@ -73,7 +74,6 @@ on a laptop against an AWS emulator, and on real AWS from the same Terraform.
 - [Deploy to AWS](#️-deploy-to-aws)
 - [Security model](#-security-model)
 - [Testing](#-testing)
-- [Screenshots](#️-screenshots)
 - [Documentation](#-documentation)
 - [Roadmap](#️-roadmap)
 - [FAQ](#-faq)
@@ -107,6 +107,31 @@ EVS is that stitching, done carefully and tested end to end.
 <td align="center" width="16%"><h3>4</h3>delivery drivers<br><sub>CloudFront · S3 · proxy · public</sub></td>
 <td align="center" width="16%"><h3>0</h3>idle workers<br><sub>scales from zero</sub></td>
 </tr>
+</table>
+
+## 🖼️ Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/overview.png" alt="Overview"><br><sub><b>Overview.</b> Pipeline health, queue depth, storage, active sessions.</sub></td>
+    <td width="50%"><img src="docs/assets/screenshots/videos.png" alt="Videos"><br><sub><b>Videos.</b> Every asset from upload to delivery. Failures carry a client-safe reason.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/player-quality.png" alt="Player quality menu"><br><sub><b>Player.</b> Manual rendition switching across the ABR ladder.</sub></td>
+    <td><img src="docs/assets/screenshots/player-scrub.png" alt="Thumbnail scrubbing"><br><sub><b>Scrubbing.</b> Sprite thumbnails from a <code>#xywh</code> WebVTT track.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/sessions.png" alt="Sessions"><br><sub><b>Sessions.</b> One row per minted token, revocable instantly.</sub></td>
+    <td><img src="docs/assets/screenshots/policies.png" alt="Policies"><br><sub><b>Playback policies.</b> TTL, origins, concurrency, watermark, downloads.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/webhooks.png" alt="Webhooks"><br><sub><b>Webhooks.</b> Signed deliveries from the outbox, with redelivery.</sub></td>
+    <td><img src="docs/assets/screenshots/api-keys.png" alt="API keys"><br><sub><b>API keys.</b> Least-privilege scopes per integration.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/audit.png" alt="Audit log"><br><sub><b>Audit log.</b> Every mutation, attributed. The database refuses edits.</sub></td>
+    <td><img src="docs/assets/screenshots/usage.png" alt="Usage"><br><sub><b>Usage.</b> Daily rollups written in the same transaction as the work.</sub></td>
+  </tr>
 </table>
 
 ## ✨ Features
@@ -491,7 +516,7 @@ The narrated version, with excerpts, is **[docs/guides/walkthrough.md](docs/guid
 | --- | --- | --- |
 | 🛠️ **Backend engineer** | [`packages/core/src/queue`](packages/core/src/queue) | [`apps/api/src/services`](apps/api/src/services) → [`apps/api/test/integration`](apps/api/test/integration) |
 | 🎞️ **Video engineer** | [`apps/worker/src/encoding`](apps/worker/src/encoding) | [`apps/worker/test/integration/pipeline.int.test.ts`](apps/worker/test/integration/pipeline.int.test.ts) (encode, encrypt, decrypt) |
-| ☁️ **Platform / DevOps** | [`infra/terraform/envs/aws-prod`](infra/terraform/envs/aws-prod) | [`infra/terraform/modules`](infra/terraform/modules) → [`infra/packer`](infra/packer) → [`.github/workflows`](.github/workflows) |
+| ☁️ **Platform / DevOps** | [`infra/terraform/envs/aws-prod`](infra/terraform/envs/aws-prod) | [`infra/terraform/modules`](infra/terraform/modules) → [`infra/packer`](infra/packer) → [`.github/workflows-full`](.github/workflows-full) |
 | 🔒 **Security reviewer** | [docs/architecture/security.md](docs/architecture/security.md) | [threat model](docs/architecture/threat-model.md) → [`packages/core/src/crypto`](packages/core/src/crypto) → [`apps/api/src/webhooks/ssrf.ts`](apps/api/src/webhooks/ssrf.ts) |
 | 🎨 **Frontend engineer** | [`packages/player/src`](packages/player/src) | [`apps/console/src/pages`](apps/console/src/pages) → [`apps/console/src/api`](apps/console/src/api) |
 | 🧑‍💼 **Evaluating it** | This README + [`make demo`](#-quickstart) | [HLD](docs/architecture/HLD.md) → [ADRs](docs/architecture/adr/README.md) |
@@ -724,35 +749,11 @@ flowchart LR
 | **Contract** | Console types ⊆ OpenAPI schemas · OpenAPI ≡ router · reference receiver accepts what the dispatcher signs | `make test` |
 | **End-to-end** (9) | Docker stack on the emulator: upload → transcode → token-gated playlists and key → **the delivered key decrypts the delivered segment** → revocation → 401 | `make e2e` |
 
-Ready-made GitHub Actions workflows ship in [`.github/workflows`](.github/workflows): lint,
-typecheck, unit and integration tests, image builds, `terraform validate`, tflint, checkov,
-gitleaks, CodeQL and the e2e suite. They are not run on this repository; enable Actions in
-your fork to use them. Every gate above also runs locally through `make`.
-
-## 🖼️ Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/assets/screenshots/overview.png" alt="Overview"><br><sub><b>Overview.</b> Pipeline health, queue depth, storage, active sessions.</sub></td>
-    <td width="50%"><img src="docs/assets/screenshots/videos.png" alt="Videos"><br><sub><b>Videos.</b> Every asset from upload to delivery. Failures carry a client-safe reason.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/screenshots/player-quality.png" alt="Player quality menu"><br><sub><b>Player.</b> Manual rendition switching across the ABR ladder.</sub></td>
-    <td><img src="docs/assets/screenshots/player-scrub.png" alt="Thumbnail scrubbing"><br><sub><b>Scrubbing.</b> Sprite thumbnails from a <code>#xywh</code> WebVTT track.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/screenshots/sessions.png" alt="Sessions"><br><sub><b>Sessions.</b> One row per minted token, revocable instantly.</sub></td>
-    <td><img src="docs/assets/screenshots/policies.png" alt="Policies"><br><sub><b>Playback policies.</b> TTL, origins, concurrency, watermark, downloads.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/screenshots/webhooks.png" alt="Webhooks"><br><sub><b>Webhooks.</b> Signed deliveries from the outbox, with redelivery.</sub></td>
-    <td><img src="docs/assets/screenshots/api-keys.png" alt="API keys"><br><sub><b>API keys.</b> Least-privilege scopes per integration.</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/assets/screenshots/audit.png" alt="Audit log"><br><sub><b>Audit log.</b> Every mutation, attributed. The database refuses edits.</sub></td>
-    <td><img src="docs/assets/screenshots/usage.png" alt="Usage"><br><sub><b>Usage.</b> Daily rollups written in the same transaction as the work.</sub></td>
-  </tr>
-</table>
+A fast [`checks`](.github/workflows/checks.yml) workflow (lint, typecheck, unit tests) runs on
+every push and pull request. The full pipeline, with integration tests on Postgres, image builds,
+`terraform validate`, tflint, checkov, gitleaks, CodeQL and the e2e suite, ships ready-made in
+[`.github/workflows-full`](.github/workflows-full) for you to enable in a fork. Every gate also
+runs locally through `make`.
 
 ## 📖 Documentation
 
