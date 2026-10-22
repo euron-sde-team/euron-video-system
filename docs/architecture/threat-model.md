@@ -43,7 +43,7 @@ Each threat below is listed with its mitigation and the residual risk.
 | Threat | Mitigation | Residual |
 | ------ | ---------- | -------- |
 | Authorized viewer extracts the content key | n/a for clear-key schemes; watermark deters recording | **Accepted.** Hardware DRM is on the roadmap (ADR-0003). |
-| Bucket made public by mistake | Block Public Access at the bucket level, OAC, TLS-only policy, checkov in CI | An account-level override by an admin |
+| Bucket made public by mistake | Block Public Access at the bucket level, OAC, TLS-only policy, checkov policy checks (workflow provided) | An account-level override by an admin |
 | Database dump | Content keys wrapped by KMS, API keys peppered, webhook secrets sealed, IPs hashed | Video titles and metadata are in plaintext |
 | Error messages leak internals | Production errors return a code and request id; stack traces only in logs | None known |
 | Webhook used for SSRF into the VPC or metadata service | Private, loopback, link-local and metadata IPs refused at delivery time in production | DNS rebinding between check and connect. Low impact because the response body is not returned. |

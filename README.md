@@ -26,10 +26,10 @@
 
 <p align="center">
   <b><a href="#-quickstart">Quickstart</a></b> ·
-  <b><a href="#-architecture">Architecture</a></b> ·
+  <b><a href="#️-architecture">Architecture</a></b> ·
   <b><a href="#-explore-the-repository">Explore the repo</a></b> ·
   <b><a href="#-api-at-a-glance">API</a></b> ·
-  <b><a href="#-deploy-to-aws">Deploy</a></b> ·
+  <b><a href="#️-deploy-to-aws">Deploy</a></b> ·
   <b><a href="docs/architecture/security.md">Security</a></b> ·
   <b><a href="#-documentation">Docs</a></b>
 </p>
@@ -56,44 +56,28 @@ on a laptop against an AWS emulator, and on real AWS from the same Terraform.
 
 ---
 
-## 📚 Contents
+## 📚 Table of contents
 
-<table>
-<tr>
-<td valign="top" width="33%">
-
-**Understand**
 - [Why EVS](#-why-evs)
 - [At a glance](#-at-a-glance)
 - [Features](#-features)
-- [Architecture](#-architecture)
+- [Architecture](#️-architecture)
+  - [The life of a video](#the-life-of-a-video)
 - [Tech stack](#-tech-stack)
-
-</td>
-<td valign="top" width="33%">
-
-**Use**
 - [Prerequisites](#-prerequisites)
 - [Quickstart](#-quickstart)
-- [Integrate it](#-integrate-it-into-your-platform)
-- [API](#-api-at-a-glance)
-- [Configuration](#%EF%B8%8F-configuration)
-- [Deploy to AWS](#-deploy-to-aws)
-
-</td>
-<td valign="top" width="33%">
-
-**Go deeper**
 - [Explore the repository](#-explore-the-repository)
+- [Integrate it into your platform](#-integrate-it-into-your-platform)
+- [API at a glance](#-api-at-a-glance)
+- [Configuration](#️-configuration)
+- [Deploy to AWS](#️-deploy-to-aws)
 - [Security model](#-security-model)
 - [Testing](#-testing)
-- [Screenshots](#-screenshots)
+- [Screenshots](#️-screenshots)
 - [Documentation](#-documentation)
-- [Roadmap](#-roadmap) · [FAQ](#-faq)
-
-</td>
-</tr>
-</table>
+- [Roadmap](#️-roadmap)
+- [FAQ](#-faq)
+- [Contributing, security and license](#-contributing-security-and-license)
 
 ## 💡 Why EVS
 
@@ -717,7 +701,7 @@ can host several isolated deployments. The step-by-step guide is
 | **Secrets** | Secrets Manager only. The DB password is read per connection, so rotation needs no restart. Webhook secrets are sealed at rest. |
 | **Integrity** | Audit log append-only by trigger. Webhooks written in the same transaction as the change they report. |
 | **Infrastructure** | Private subnets, IMDSv2, TLS-only bucket policies, non-root containers, least-privilege IAM per component |
-| **Supply chain** | Pinned images and lockfile, Dependabot, gitleaks, CodeQL, checkov, tflint in CI |
+| **Supply chain** | Pinned images and lockfile; gitleaks, CodeQL, checkov and tflint workflows provided, plus `make sanitize` locally |
 
 > [!IMPORTANT]
 > **What AES-128 does not protect against.** A viewer who is *legitimately authorized* for a
@@ -740,9 +724,10 @@ flowchart LR
 | **Contract** | Console types ⊆ OpenAPI schemas · OpenAPI ≡ router · reference receiver accepts what the dispatcher signs | `make test` |
 | **End-to-end** (9) | Docker stack on the emulator: upload → transcode → token-gated playlists and key → **the delivered key decrypts the delivered segment** → revocation → 401 | `make e2e` |
 
-CI ([`.github/workflows`](.github/workflows)) runs lint, typecheck, unit and integration
-tests, image builds, `terraform validate`, tflint, checkov, gitleaks and CodeQL on every pull
-request. The e2e suite runs nightly and on demand.
+Ready-made GitHub Actions workflows ship in [`.github/workflows`](.github/workflows): lint,
+typecheck, unit and integration tests, image builds, `terraform validate`, tflint, checkov,
+gitleaks, CodeQL and the e2e suite. They are not run on this repository; enable Actions in
+your fork to use them. Every gate above also runs locally through `make`.
 
 ## 🖼️ Screenshots
 

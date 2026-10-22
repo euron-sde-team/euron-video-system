@@ -205,7 +205,7 @@ correlate one client's requests, useless for recovering the address without the 
 | IAM | One role per component, least privilege, KMS grants conditioned on encryption context |
 | Secrets | Secrets Manager only. Nothing secret in task definitions, AMIs or the repository. |
 | Database | RDS encrypted at rest, master password managed by RDS in Secrets Manager, deletion protection in production |
-| Supply chain | Pinned base images, lockfile installs, Dependabot, gitleaks, CodeQL, checkov in CI |
+| Supply chain | Pinned base images, lockfile installs; gitleaks, CodeQL and checkov workflows provided for forks, plus `make sanitize` locally |
 | Containers | Non-root users, minimal runtime images |
 
 ## What AES-128 does and does not protect

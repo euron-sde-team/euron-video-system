@@ -391,7 +391,7 @@ resource "aws_ecs_task_definition" "api" {
 }
 
 # One-off migration task: `aws ecs run-task --task-definition <prefix>-migrate ...`
-# (see docs/guides/deploy-aws-terraform.md). Same network and secrets.
+# (see docs/guides/deploy-aws.md). Same network and secrets.
 resource "aws_ecs_task_definition" "migrate" {
   family                   = "${var.name_prefix}-migrate"
   requires_compatibilities = ["FARGATE"]
@@ -406,13 +406,21 @@ resource "aws_ecs_task_definition" "migrate" {
     cpu_architecture        = "ARM64"
   }
 
+  volume {
+    name = "tmp"
+  }
+
   container_definitions = jsonencode([{
-    name        = "migrate"
-    image       = local.tools_image
-    essential   = true
-    command     = ["pnpm", "db:migrate"]
-    environment = [for k, v in local.environment : { name = k, value = v }]
-    secrets     = local.secrets
+    name      = "migrate"
+    image     = local.tools_image
+    essential = true
+    command   = ["pnpm", "db:migrate"]
+    # Read-only root like the API task. pnpm and tsx only need a writable home
+    # and cache, both pointed at the /tmp volume (verified with --read-only).
+    readonlyRootFilesystem = true
+    mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+    environment            = [for k, v in merge(local.environment, { HOME = "/tmp", XDG_CACHE_HOME = "/tmp" }) : { name = k, value = v }]
+    secrets                = local.secrets
     logConfiguration = {
       logDriver = "awslogs"
       options = {

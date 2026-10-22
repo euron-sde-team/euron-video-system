@@ -28,7 +28,7 @@ tours the codebase by following one video from upload to playback.
 
 ## Before you open a pull request
 
-Every one of these runs in CI and must pass:
+Run all of these before opening a pull request. Each must pass:
 
 ```bash
 pnpm lint
