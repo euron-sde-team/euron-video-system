@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars (git-ignored) and replace every placeholder.
+region      = "us-east-1"
+name_prefix = "evs-prod" # bucket names derive from this; make it globally unique, e.g. "acme-evs-prod"
+
+api_domain          = "api.video.example.com"
+api_certificate_arn = "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERT_ID>"
+console_origins     = ["https://console.video.example.com"]
+
+# Optional custom CDN domain (certificate must be in us-east-1)
+# media_aliases         = ["media.video.example.com"]
+# media_certificate_arn = "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERT_ID>"
+
+worker_ami_id = "<AMI_ID from packer build>"
+api_image_tag = "0.1.0"
+
+# max_workers      = 20
+# enable_jobs_pool = false
+# alarm_email      = "oncall@example.com"

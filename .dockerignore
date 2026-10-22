@@ -1,0 +1,19 @@
+# Keep build contexts small and secret-free.
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.git
+.github
+docs
+infra/terraform
+infra/packer
+samples
+.demo
+**/.env
+**/.env.*
+!**/.env.example
+**/*.tfstate*
+**/.terraform
+*.log
+.DS_Store

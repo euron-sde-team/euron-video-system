@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="t d">
+  <title id="t">Euron Video System</title>
+  <desc id="d">Self-hosted video transcoding and encrypted HLS delivery</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d12"/>
+      <stop offset="1" stop-color="#11151d"/>
+    </linearGradient>
+    <linearGradient id="rung" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b8cff" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#5b8cff" stop-opacity="0.9"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.035"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="320" rx="16" fill="url(#bg)"/>
+  <rect width="1280" height="320" rx="16" fill="url(#grid)"/>
+
+  <!-- Wordmark -->
+  <g font-family="Inter, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="72" y="140" fill="#f4f6fb" font-size="54" font-weight="650" letter-spacing="-1.2">Euron Video System</text>
+    <text x="74" y="186" fill="#9aa3b5" font-size="22" font-weight="400">Self-hosted transcoding, encrypted HLS delivery, and a control plane you own.</text>
+    <g font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="15" fill="#7d879b">
+      <text x="74" y="246">FFmpeg ABR ladder</text>
+      <text x="250" y="246" fill="#3a4152">/</text>
+      <text x="270" y="246">AES-128 + KMS</text>
+      <text x="408" y="246" fill="#3a4152">/</text>
+      <text x="428" y="246">Spot autoscaling</text>
+      <text x="590" y="246" fill="#3a4152">/</text>
+      <text x="610" y="246">Terraform</text>
+    </g>
+  </g>
+
+  <!-- ABR ladder: three rungs converging into an encrypted segment stream -->
+  <g transform="translate(860 70)">
+    <g font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="13" fill="#9aa3b5">
+      <text x="0" y="24">1080p</text>
+      <text x="0" y="94">720p</text>
+      <text x="0" y="164">480p</text>
+    </g>
+    <rect x="56" y="12" width="150" height="16" rx="4" fill="url(#rung)"/>
+    <rect x="56" y="82" width="110" height="16" rx="4" fill="url(#rung)"/>
+    <rect x="56" y="152" width="70" height="16" rx="4" fill="url(#rung)"/>
+    <path d="M214 20 C 250 20, 250 90, 286 90" fill="none" stroke="#5b8cff" stroke-opacity="0.5" stroke-width="2"/>
+    <path d="M174 90 L 286 90" fill="none" stroke="#5b8cff" stroke-opacity="0.5" stroke-width="2"/>
+    <path d="M134 160 C 230 160, 250 90, 286 90" fill="none" stroke="#5b8cff" stroke-opacity="0.5" stroke-width="2"/>
+    <!-- encrypted segments -->
+    <g fill="#1a2030" stroke="#5b8cff" stroke-opacity="0.7">
+      <rect x="292" y="74" width="30" height="32" rx="4"/>
+      <rect x="328" y="74" width="30" height="32" rx="4"/>
+      <rect x="364" y="74" width="30" height="32" rx="4"/>
+    </g>
+    <!-- lock -->
+    <g transform="translate(312 128)" fill="none" stroke="#9aa3b5" stroke-width="2">
+      <rect x="0" y="10" width="22" height="16" rx="3"/>
+      <path d="M4 10 V6 a7 7 0 0 1 14 0 V10"/>
+    </g>
+    <text x="342" y="148" font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="12" fill="#7d879b">AES-128</text>
+  </g>
+</svg>

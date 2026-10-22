@@ -1,0 +1,34 @@
+[Unit]
+Description=Euron Video System transcode worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=evs
+Group=evs
+EnvironmentFile=/etc/evs/worker.env
+Environment=FFMPEG_BIN=/usr/local/bin/ffmpeg
+Environment=FFPROBE_BIN=/usr/local/bin/ffprobe
+Environment=WHISPER_BIN=/opt/whisper.cpp/whisper-cli
+Environment=WHISPER_MODEL=@WHISPER_MODEL@
+ExecStart=/usr/bin/node /opt/evs/worker/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/evs/worker.log
+StandardError=append:/var/log/evs/worker.log
+
+# Hardening. NoNewPrivileges/RestrictSUIDSGID stay off for one reason: an
+# idle worker runs `sudo shutdown -h now` (launch template shutdown behavior =
+# terminate), and sudoers allows the evs user exactly that command, nothing else.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/evs /var/log/evs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

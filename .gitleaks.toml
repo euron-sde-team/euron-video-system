@@ -1,0 +1,56 @@
+# gitleaks configuration: the default ruleset plus rules for cloud identifiers
+# that are not secrets on their own but must never appear in a public repo
+# (they map infrastructure and aid targeted attacks).
+title = "euron-video-system"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "aws-account-id-in-arn"
+description = "AWS ARN carrying a real 12-digit account id"
+regex = '''arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:(\d{12}):'''
+secretGroup = 1
+keywords = ["arn:aws"]
+[rules.allowlist]
+regexes = ['''^000000000000$''', '''^123456789012$''']
+
+[[rules]]
+id = "aws-account-id-labelled"
+description = "12-digit number labelled as an AWS account"
+regex = '''(?i)(?:account[_ -]?id|aws[_ -]?account|account)["'\s:=]{1,6}(\d{12})\b'''
+secretGroup = 1
+keywords = ["account"]
+[rules.allowlist]
+regexes = ['''^000000000000$''', '''^123456789012$''']
+
+[[rules]]
+id = "aws-resource-id"
+description = "Concrete AWS resource id (AMI, subnet, security group, VPC, ...)"
+regex = '''\b((?:ami|subnet|sg|vpc|pcx|rtb|igw|nat|eni|vol|snap|i)-[0-9a-f]{8,17})\b'''
+secretGroup = 1
+keywords = ["ami-", "subnet-", "sg-", "vpc-", "pcx-", "rtb-", "igw-", "nat-", "eni-", "vol-", "snap-", "i-"]
+[rules.allowlist]
+regexes = ['''-0{8,17}$''', '''-(?:x+|abc[0-9a-f]*|1234567[0-9a-f]*)$''']
+
+[[rules]]
+id = "rds-endpoint"
+description = "Concrete RDS endpoint hostname"
+regex = '''\b[a-z0-9-]+\.[a-z0-9]{12}\.[a-z0-9-]+\.rds\.amazonaws\.com\b'''
+keywords = ["rds.amazonaws.com"]
+
+[allowlist]
+description = "Documented emulator credentials and example placeholders"
+regexes = [
+  '''AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)[=:]\s*["']?test["']?''',
+  '''(access|secret)_key\s*=\s*"test"''',
+  '''replace-with-output-of-make-env''',
+  # Test fixtures use visibly fake keys: evs_<8 chars>_secret|test|fake
+  '''\bevs_[a-z0-9]{8}_(secret|test|fake)[A-Za-z0-9_]*\b''',
+  '''-----BEGIN PRIVATE KEY-----\\n\.\.\.\\n-----END PRIVATE KEY-----''',
+]
+paths = [
+  '''pnpm-lock\.yaml''',
+  '''(^|/)node_modules/''',
+  '''\.example$''',
+]
