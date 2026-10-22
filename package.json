@@ -23,11 +23,11 @@
     "evs": "tsx scripts/evs.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.15.6",
     "dotenv": "^17.2.3",
-    "eslint": "^9.39.1",
+    "eslint": "^10.13.0",
     "kysely": "^0.28.8",
     "kysely-codegen": "^0.20.0",
     "pg": "^8.16.3",
