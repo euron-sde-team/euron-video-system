@@ -22,6 +22,8 @@
   <a href="https://github.com/euron-sde-team/euron-video-system/pulls"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-34d399?style=flat"></a>
   <a href="https://github.com/euron-sde-team/euron-video-system/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/euron-sde-team/euron-video-system?style=flat&color=8b95a8"></a>
   <img alt="Runs locally with no AWS account" src="https://img.shields.io/badge/runs_locally-no_AWS_account_needed-0b0d12?style=flat">
+  <br>
+  <a href="#built-by-the-team-behind-euron"><img alt="Built by the team behind Euron" src="https://img.shields.io/badge/built_by-Euron-4f46e5?style=flat"></a>
 </p>
 
 <p align="center">
@@ -53,6 +55,24 @@ on a laptop against an AWS emulator, and on real AWS from the same Terraform.
 > Everything in the tour above ran for real: Docker Compose on a laptop against a local AWS
 > emulator. The pipeline transcoded, encrypted and KMS-wrapped those clips, and the console
 > streamed them back through tokenized playlists. `make demo` reproduces it.
+
+<h3 align="center">Built by the team behind Euron</h3>
+
+<p align="center">Euron Video System comes from the people who build these platforms. If you like how this repository is built, come and see what we build with it.</p>
+
+<p align="center">
+  <a href="https://euron.one"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/euron-dark.svg"><img src="docs/assets/brand/euron-light.svg" alt="Euron: learn the latest technologies from industry experts. Visit euron.one" width="31%"></picture></a>
+  <a href="https://euronsystems.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/euron-systems-dark.svg"><img src="docs/assets/brand/euron-systems-light.svg" alt="Euron Systems: the SaaS platform for educators and creators. Visit euronsystems.com" width="31%"></picture></a>
+  <a href="https://alphaeuron.com"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/alpha-euron-dark.svg"><img src="docs/assets/brand/alpha-euron-light.svg" alt="Alpha Euron: where school kids grow creativity and tech skills with AI. Visit alphaeuron.com" width="31%"></picture></a>
+</p>
+
+<p align="center">
+  <a href="https://www.instagram.com/euron_official"><img src="https://img.shields.io/badge/Instagram-E4405F?style=flat-square&logo=instagram&logoColor=white" alt="Instagram"></a>
+  <a href="https://www.linkedin.com/company/euronone/posts/"><img src="https://img.shields.io/badge/LinkedIn-0A66C2?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
+  <a href="https://x.com/euron712"><img src="https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white" alt="X"></a>
+  <a href="https://www.youtube.com/@Euron-official"><img src="https://img.shields.io/badge/YouTube-FF0000?style=flat-square&logo=youtube&logoColor=white" alt="YouTube"></a>
+  <a href="https://whatsapp.com/channel/0029VaeeJwq9RZAfPW9P2l07"><img src="https://img.shields.io/badge/WhatsApp_channel-25D366?style=flat-square&logo=whatsapp&logoColor=white" alt="WhatsApp channel"></a>
+</p>
 
 ---
 
@@ -835,7 +855,7 @@ It helps others find it.
 Released under the **[MIT License](LICENSE)**: free to use, modify and distribute, commercially or not.
 
 <p align="center">
-  <sub>Open source, built and maintained by <b>ENGAGESPHERE TECHNOLOGY PRIVATE LIMITED</b> as part of its open-source initiative.</sub><br>
+  <sub>Open source, built and maintained by <b>ENGAGESPHERE TECHNOLOGY PRIVATE LIMITED</b> as part of its open-source initiative, by the team behind <a href="https://euron.one">Euron</a>, <a href="https://euronsystems.com">Euron Systems</a> and <a href="https://alphaeuron.com">Alpha Euron</a>.</sub><br>
   <sub>Demo footage in the screenshots: <i>Big Buck Bunny</i> and <i>Sintel</i> © Blender Foundation,
   <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>. Sample media is downloaded at demo time and is not part of this repository.</sub>
 </p>
